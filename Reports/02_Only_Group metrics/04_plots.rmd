@@ -1,0 +1,172 @@
+
+#### 1. Speed over flock vars - group by experiment
+
+## 1.1. groups
+
+```{R}
+{
+  # housekeeping
+  rm(list=ls())
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # objects 
+  cols1 = c("#8A84E2","#F25757","#F2E863")
+  pdf_it = T
+  filePath = file.path(PROJHOME, "Figures", "ggplot2x2", "ggplot2x2_r_output.pdf")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  dg$experiment = as.factor(dg$experiment)
+  dg$experiment <- factor(dg$experiment, levels = rev(levels(dg$experiment)))
+  load(file.path(PROJHOME , "Output" , "foos" , "ffampvsstasisdata.rda"))
+  
+  
+  # dg$experiment2 = dg$experiment
+  # dg$experiment2[dg$experiment == "Training"]  = cols1[3]
+  # dg$experiment2[dg$experiment == "leadManip"] = cols1[2]
+  # dg$experiment2[dg$experiment == "GMC"]       = cols1[3]
+  
+  # libraries
+  library(ggplot2)
+  library(gridExtra)
+}
+# plotzzz
+{
+  g1 = ggplot( dg,aes( flock.stasis    , medspeed, col = experiment ))+geom_smooth(method = "lm")+geom_point()+
+    scale_fill_manual(values=cols1)+
+    scale_color_manual(values=cols1)+
+    xlim( c( min(dg$flock.stasis,na.rm = T),0))
+  g2 = ggplot( dg,aes( flock.spread    , medspeed, col = experiment ))+geom_smooth(method = "lm")+geom_point()+
+    scale_fill_manual(values=cols1)+
+    scale_color_manual(values=cols1)
+  g3 = ggplot( dg,aes( lrspread    , medspeed, col = experiment ))+geom_smooth(method = "lm")+geom_point()+
+    scale_fill_manual(values=cols1)+
+    scale_color_manual(values=cols1)
+  g4 = ggplot( dg,aes( fbspread    , medspeed, col = experiment ))+geom_smooth(method = "lm")+geom_point()+ 
+    scale_fill_manual (values=cols1)+
+    scale_color_manual(values=cols1)
+  g5 = ggplot( df,aes( stasis      , ff      , col = exp        ))+geom_smooth(method = "lm")+geom_point()+
+    scale_fill_manual(values=cols1[2:3])+
+    scale_color_manual(values=cols1[2:3])+ 
+    ylim(c(6.5,7.7))+
+      xlim( c( min(df$stasis,na.rm = T),0))
+    g6 = ggplot( df,aes( stasis      , amp      , col = exp        ))+geom_smooth(method = "lm")+geom_point()+
+    scale_fill_manual(values=cols1[2:3])+
+    scale_color_manual(values=cols1[2:3])+
+      ylim(c(11.8,14.2))+
+     xlim( c( min(df$stasis,na.rm = T),0))
+}
+
+if( pdf_it){
+  pdf( filePath, useDingbats = F)
+  grid.arrange(g1,g5,g6,ncol=2)
+  dev.off()
+}
+
+
+grid.arrange(g1,g5,g6,ncol=2)
+
+
+```
+
+
+## 1.2 Flock stasis
+
+```{R}
+{
+  # housekeeping
+  rm(list=ls())
+  
+  # libraries
+  library(speedManip)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # objects 
+  cols1 = c("#8A84E2","#F25757","#F2E863")
+  pdf_it = T
+  filePath = file.path(PROJHOME, "Figures", "ggplot2x2", "ggplot2x2_r_output.pdf")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+  dg$cond = apply( cbind(dg[,c("masscond", "lead.fol", "experiment")]),1,function(x){paste(x,collapse = ".")} )
+  dg$cond = as.factor(dg$cond)
+  dg$cond <- factor(dg$cond, levels = rev(levels(dg$cond)))
+  dg = dg[order(dg$cond) ,]
+  
+  dg$col = NA
+  dg$col[!is.na(dg$lead.fol)] = cols1[2]
+  dg$col[!is.na(dg$masscond)] = cols1[3]
+  dg$col[dg$experiment=="Training"] = cols1[1]
+  
+}
+
+{
+pdf ( file.path ( PROJHOME , "Figures" , "flock_stasis_boxplots", "flock_stasis_boxplots.pdf"),useDingbats = F)
+
+par(mfrow = c(1,1))
+par( mar= c(12,4,4,15))
+boxy.lady("flock.stasis", "cond", dg,jit = 0.1, ylims = c(-7,0))
+par( new = T)
+par( mar= c(24,22,4,4))
+boxy.lady("flock.stasis", "homo_hetero", dg,jit = 0.1, ylims = c(-7,0), boxcol = "grey50")
+par( new = T)
+par( mar= c(12,22,16,4))
+boxy.lady("flock.stasis", "homo_hetero_sub_fol", dg,jit = 0.1, ylims = c(-7,0), boxcol = "grey60",mult=1)
+
+dev.off()
+}
+```
+## 1.2 lr spread
+
+```{R}
+{
+  # housekeeping
+  rm(list=ls())
+  
+  # libraries
+  library(speedManip)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # objects 
+  cols1 = c("#8A84E2","#F25757","#F2E863")
+  pdf_it = T
+  filePath = file.path(PROJHOME, "Figures", "ggplot2x2", "ggplot2x2_r_output.pdf")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+  dg$cond = apply( cbind(dg[,c("masscond", "lead.fol", "experiment")]),1,function(x){paste(x,collapse = ".")} )
+  dg$cond = as.factor(dg$cond)
+  dg$cond <- factor(dg$cond, levels = rev(levels(dg$cond)))
+  dg = dg[order(dg$cond) ,]
+  
+  dg$col = NA
+  dg$col[!is.na(dg$lead.fol)] = cols1[2]
+  dg$col[!is.na(dg$masscond)] = cols1[3]
+  dg$col[dg$experiment=="Training"] = cols1[1]
+  
+}
+
+{
+#pdf ( file.path ( PROJHOME , "Figures" , "flock_spread_boxplots", "flock_stasis_boxplots.pdf"),useDingbats = F)
+
+par(mfrow = c(1,1))
+par( mar= c(12,4,4,15))
+boxy.lady("lrspread", "cond", dg,jit = 0.1)
+par( new = T)
+par( mar= c(24,22,4,4))
+boxy.lady("lrspread", "homo_hetero", dg,jit = 0.1, boxcol = "grey50")
+par( new = T)
+par( mar= c(12,22,16,4))
+boxy.lady("lrspread", "homo_hetero_sub_fol", dg,jit = 0.1,boxcol = "grey60",mult=1, ylims = range(na.omit(dg$lrspread)))
+
+#dev.off()
+}
+```

@@ -1,0 +1,139 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# 1. Sensitiv ity function
+
+```{R}
+rm(list = ls()) # housekeeping
+
+# libraries
+library(speedManip)
+sourcefunctions()
+
+# param sensitivity function
+sensitivity(fis.dist = 25, minflight.prop = 0.1)
+sensitivity(fis.dist = 75, minflight.prop = 0.1)
+sensitivity(fis.dist = 50, minflight.prop = 0.05)
+sensitivity(fis.dist = 50, minflight.prop = 0.25)
+
+sensitivity(fis.dist = 75, minflight.prop = 0.25)
+sensitivity(fis.dist = 25, minflight.prop = 0.25)
+sensitivity(fis.dist = 25, minflight.prop = 0.05)
+sensitivity(fis.dist = 75, minflight.prop = 0.05)
+
+```
+
+# 2. Sensitivity stats
+ 
+```{R}
+rm(list = ls()) # housekeeping
+
+# libraries
+library(speedManip)
+sourcefunctions()
+
+# sensitivity models function
+sensitivity.models(fis.dist = 50, minflight.prop = 0.1)
+sensitivity.models(fis.dist = 25, minflight.prop = 0.1)
+sensitivity.models(fis.dist = 75, minflight.prop = 0.1)
+sensitivity.models(fis.dist = 50, minflight.prop = 0.05)
+sensitivity.models(fis.dist = 50, minflight.prop = 0.25) 
+
+```
+
+# 3. Best model - same across all conditions?
+
+```{R}
+rm(list=ls())# housekeeping
+
+# folder 
+fold = file.path(PROJHOME, "Output", "Groupflight_ind_grp_metrics", "sensitivity")
+folds = list.files(fold)
+folds = c(folds)
+
+for ( i in 1:length(folds)){
+  #i=1
+  load( file.path( fold, folds[i], "Flock_variables_vs_speed_all_experiments-GROUP.rda") )
+  print(mat)
+  
+}
+
+for ( i in 1:length(folds)){
+    load( file.path( fold, folds[i], "correlation-matrix.rda") )
+  print(mat.gro)
+}
+
+fis.dist = substr( folds, 10,11)
+minflight.prop = substr( folds, 27,nchar(folds))
+load( file.path(fold, folds[1], "bestmodel.rda"))
+mat = cbind( fis.dist = fis.dist[1], minflight.prop = minflight.prop[1],mat)
+mat.bestmod = mat
+for ( i in 2:length(folds)){
+    load( file.path( fold, folds[i], "bestmodel.rda") )
+  mat = cbind( fis.dist = fis.dist[i] , minflight.prop = minflight.prop[i],mat)
+    mat.bestmod = rbind(  mat.bestmod,mat)
+}
+write.csv ( mat.bestmod, file = file.path ( PROJHOME , "Output" , "Tables_stats", "sensitivity-results.csv"))
+
+load( file.path(fold,"fis-dist=50minflight-prop=0.1"  , "bestmodel.rda"))
+write.csv ( mat , file = file.path ( PROJHOME , "Output", "Tables_stats" , "bestmodel.csv"))
+```
+
+# 4. Sensitivity to condition predicting stasis and lrspread
+
+```{R}
+{
+rm(list=ls())# housekeeping
+
+# folders
+fold = file.path(PROJHOME, "Output", "Groupflight_ind_grp_metrics", "sensitivity")
+folds = list.files(fold)
+
+
+# libraries
+library(speedManip)
+sourcefunctions()
+
+# metadata
+fis.dist = substr( folds, 10,11)
+minflight.prop = substr( folds, 27,nchar(folds))
+}
+# results
+mat.stasis = data.frame(sensitivity.predicting.stasis.spread(depvar = "flock.stasis", folder = folds[1]))
+mat.stasis$conditions = folds[1]
+mat.stasis$fis.dist = fis.dist[1]
+mat.stasis$minflight.prop = minflight.prop[1]
+mat.stasis$comparison = dimnames ( mat.stasis)[[1]]
+
+for ( i in 2:length(folds)){
+  # i = 2
+  mat = data.frame(sensitivity.predicting.stasis.spread(depvar = "flock.stasis", folder = folds[i]))
+  mat$conditions = folds[i]
+  mat$fis.dist = fis.dist[i]
+  mat$minflight.prop = minflight.prop[i]
+  mat$comparison = dimnames ( mat)[[1]]
+  mat.stasis= rbind( mat.stasis, mat)
+}
+write.csv( mat.stasis, file = file.path(PROJHOME , "Output", "Tables_stats" , "stasis-sensitivity.csv"))
+
+# results
+mat.spread = data.frame(sensitivity.predicting.stasis.spread(depvar = "lrspread", folder = folds[1]))
+mat.spread$conditions = folds[1]
+mat.spread$fis.dist = fis.dist[1]
+mat.spread$minflight.prop = minflight.prop[1]
+mat.spread$comparison = dimnames ( mat.spread)[[1]]
+for ( i in 2:length(folds)){
+  # i = 2
+  mat = data.frame(sensitivity.predicting.stasis.spread(depvar = "lrspread", folder = folds[i]))
+  mat$conditions = folds[i]
+  mat$fis.dist = fis.dist[i]
+  mat$minflight.prop = minflight.prop[i]
+  mat$comparison = dimnames ( mat)[[1]]
+  mat.spread= rbind( mat.spread, mat)
+}
+write.csv( mat.spread, file = file.path(PROJHOME , "Output", "Tables_stats" , "spread-sensitivity.csv"))
+```
+
+

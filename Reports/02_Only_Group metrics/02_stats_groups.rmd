@@ -1,0 +1,679 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+###### CONTENTS #######
+
+###0. Choose variables
+
+###1. Correlation of covariates
+
+
+###########
+
+SCRIPT
+
+###########
+
+###0. Choose variables
+
+```{R}
+fis.dist = 50
+minflight.prop = 0.1
+fold.vars = paste0("fis-dist=",fis.dist,"minflight-prop=",minflight.prop)
+li = list( fis.dist, minflight.prop , fold.vars)
+save( li, file = file.path(PROJHOME , "Data" , "metadata" , "temporary-variables.rda"))
+```
+
+###1. Correlation of covariates
+
+```{R}
+# housekeeping
+rm(list=ls())
+
+# folder 
+load( file.path(PROJHOME , "Data" , "metadata", "temporary-variables.rda"))
+fold.vars = li[[3]]
+fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", fold.vars)
+
+# data
+load(file.path(fold, "dat-group.rda"))
+dgro = dg
+load(file.path(fold, "dat-ind.rda"))
+dind = di
+
+# variables
+vars = c("fbspread","lrspread","flock.spread","flock.stasis")
+
+# empty mat
+mat.gro = matrix(NA, length(vars), length(vars),dimnames = list(vars,vars))
+mat.ind = matrix(NA, length(vars), length(vars),dimnames = list(vars,vars))
+
+# correlations
+for ( i in 1:length(vars)){
+  for ( j in 1:length(vars)){
+    # i =2
+    # j =1
+    if ( i > j){
+      whi = which(names(dgro) %in% vars[c(i,j)])
+      d = dgro[,whi]
+      d = d[complete.cases(d),]
+      mat.gro[i,j] = cor(d[,1],d[,2])
+    }
+  }
+}
+
+for ( i in 1:length(vars)){
+  for ( j in 1:length(vars)){
+    # i =2
+    # j =1
+    if ( i > j){
+      whi = which(names(dind) %in% vars[c(i,j)])
+      d = dind[,whi]
+      d = d[complete.cases(d),]
+      mat.ind[i,j] = cor(d[,1],d[,2])
+    }
+  }
+}
+
+mat.gro
+mat.ind
+
+dimnames(mat.gro) = list( c("Cranio-caudal spread", "Dorso-ventral spread", "Flock spread", "Flock stasis"),
+                          c("Cranio-caudal spread", "Dorso-ventral spread", "Flock spread", "Flock stasis"))
+for ( i in 1:ncol(mat.gro)){
+  mat.gro[,i] = round(mat.gro[,i],4)
+}
+write.csv( mat.gro , file = file.path (PROJHOME , "Output", "Groupflight_ind_grp_metrics", "Dat4plots", "3Tableplot", "correlation-matrix.csv"))
+```
+
+# 2. Models - group
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+  # stats 
+  exps = c("leadManip", "GMC", "Training", "all")
+  indvars = c("fbspread", "lrspread", "flock.stasis", "flock.spread")
+  mat = matrix(NA, length(indvars),length(exps),dimnames = list(indvars,exps))
+  vars = expand.grid(indvars,exps, stringsAsFactors = F)
+  names(vars) = c("indvars", "exps")
+}
+#loop
+for ( i in 1:nrow(vars)){
+  #i=7
+  indvar = vars$indvars[i]
+  exp = vars$exps[i]
+  d = stat.funct.group(dg,"log",depvar = "medspeed",indvar = indvar,cond = NULL,experiment = exp)
+  diagnostics.plot(d[[1]])
+  d[[2]]
+  mat[indvar ,exp] = as.numeric(as.character(d[[2]]$'p-value'[2]))
+}
+write.csv(mat, file = file.path(PROJHOME, "Output", "Groupflight_ind_grp_metrics", "Stats_tables", "Flock_variables_vs_speed_all_experiments-GROUP.csv"))
+
+dimnames(mat) = list(c("Cranio-caudal spread", "Dorso-ventral spread", "Flock stasis", "Flock spread"),
+                     c("Leadership composition" , "Mass composition", "Training", "All"))
+write.csv(mat, file = file.path(PROJHOME, "Output", "Groupflight_ind_grp_metrics", "Dat4plots", "3TablePlot", "Flock_variables_vs_speed_all_experiments-GROUP.csv"))
+mat
+d[[2]]
+```
+2. Does group composition or flight order predict flock stasis. Experiment by experiement. 
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+}
+
+###### stats
+
+# Does leader comp. predict flock stasis
+dg$flock.stasis = -dg$flock.stasis
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "lead.fol",cond = NULL,experiment = "leadManip")
+d[[2]]
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+#yes 
+
+# Does mass comp. predict flock stasis
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "masscond",cond = NULL,experiment = "GMC")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# no - all conditions
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "homo_hetero",cond = NULL,experiment = "GMC")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# yes - only considering homo vs hetero
+
+# Does homogeneity predict flock stasis
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "homo_hetero",cond = NULL,experiment = "all")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# no - all
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "homo_hetero_sub_fol",cond = NULL,experiment = "all")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# yes - if we remove annoying followers
+
+# Does flight order predict flock stasis?
+d = stat.funct.group(dg,"log",depvar = "flock.stasis",indvar = "flight.order",cond = NULL,experiment = "all")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# close to decreasing - All
+d = stat.funct.group(dg,"log",depvar = "flock.stasis",indvar = "flight.order",cond = NULL,experiment = "leadManip")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# increasing - not sig. Leadmanip
+d = stat.funct.group(dg,"log",depvar = "flock.stasis",indvar = "flight.order",cond = NULL,experiment = "GMC")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# decreasing - not sig. massmanip
+d = stat.funct.group(dg,"log",depvar = "flock.stasis",indvar = "flight.order",cond = NULL,experiment = "Training")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# decreasing - not sig. Training
+
+plot(-dg$flock.stasis~dg$flight.order)
+```
+
+#3. Does insta.size predict stasis or speed? 
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+}
+###### stats
+
+# Does insta.size.num predict flock stasis
+dg$flock.stasis = -dg$flock.stasis
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "insta.size.num",cond = NULL,experiment = "all")
+d[[2]]
+AIC(d[[1]])
+# no
+
+# Does insta.size predict flock stasis
+d = stat.funct.group(dg,"box",depvar = "flock.stasis",indvar = "insta.size",cond = NULL,experiment = "all")
+d[[2]]
+# no
+
+# Does insta.size predict speed
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "insta.size.num",cond = NULL,experiment = "all")
+d[[2]]
+# no
+
+# Does insta.size predict speed
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "insta.size",cond = NULL,experiment = "all")
+d[[2]]
+# some do
+
+boxplot(dg$flock.stasis~dg$insta.size)
+boxplot(dg$medspeed    ~dg$insta.size)
+
+```
+#4. Does flock stasis still predict speed when condition added to model. also does condition still predict speed after stasis?
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+}
+###### stats
+
+# Does flock stasis still predict speed when condition added to model?
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "flock.stasis",cond = "lead.fol",experiment = "leadManip")
+d[[2]]
+diagnostics.plot(d[[1]])
+# yes - leadmanip.  Also, leader still predicts
+
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "flock.stasis",cond = "masscond",experiment = "GMC")
+d[[2]]
+# no - GMC, groups = all
+
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "flock.stasis",cond = "homo_hetero",experiment = "GMC")
+d[[2]]
+# yes - GMC, groups = homo vs hetero. Also, homo-hetero does not predict after flock stasis. Does before see section 1.
+
+```
+
+
+#5. What about interaction between stasis and lr spread ?
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+  
+  # objects 
+  exps = c("leadManip","GMC", "Training", "all")
+}
+
+
+# STATS FUNCTION
+fun = function( exp, boxlog = NULL){
+  # boxlog = "log"
+  # exp = "all"
+  
+  d = stat.funct.group(dg,boxlog,depvar = "medspeed", indvar = "flock.stasis", experiment = exp)
+  mod.1 = d[[1]]
+  tab.1 = d[[2]]
+  
+  d = stat.funct.group.2var.int(dg,boxlog,depvar = "medspeed",indvar1 = "flock.stasis", indvar2 = "lrspread" ,experiment = exp)
+  mod.int = d[[1]]
+  tab.int = d[[2]]
+  
+  d = stat.funct.group.2var.sum(dg,boxlog,depvar = "medspeed",indvar1 = "flock.stasis", indvar2 = "lrspread" ,experiment = exp)
+  tab.sum = d[[2]]
+  mod.sum = d[[1]]
+  
+  whi = which.min( suppressWarnings( AIC(mod.1 , mod.int, mod.sum)$AIC))
+  
+  if ( whi == 1){
+    p = c(as.numeric(as.character(tab.1$`p-value`[2])) ,NA, "1var")
+    return(list(mod.1, tab.1, p))
+  } 
+  if ( whi == 2){
+    p = c(as.numeric(as.character(tab.1$`p-value`[2:3])), "int")
+    return(list(mod.int, tab.int, p))
+  } 
+  if ( whi == 3) {
+    p = c(as.numeric(as.character(tab.1$`p-value`[2:3])) , "sum")
+    return(list(mod.sum, tab.sum, p))
+  }
+}
+
+
+# Run function
+d1 = fun("leadManip","log")
+d2 = fun("GMC"      ,"log")
+d3 = fun("Training" ,"log")
+d4 = fun("all"      ,"log")
+
+# diagnostics
+diagnostics.plot(d1[[1]])
+diagnostics.plot(d2[[1]])
+diagnostics.plot(d3[[1]])
+diagnostics.plot(d4[[1]])
+
+# Combine results
+mat = cbind(
+  d1[[3]],
+  d2[[3]],
+  d3[[3]],
+  d4[[3]])
+dimnames(mat) = list( c("Flock stasis", "Dorso-ventral spread", "Best model"),
+                      c("Lead comp." , "Mass comp.", "Training", "All"))
+mat
+
+d1[[2]]
+d4[[2]]
+
+# save results
+write.csv(mat, file = file.path(PROJHOME, "Output", "Groupflight_ind_grp_metrics", "Dat4plots", "3TablePlot", "bestmodel.csv"))
+
+{
+  qqnorm(residuals(d4[[1]]))
+  qqline(residuals(d4[[1]]))
+}
+```
+
+# 6. predicting lr spread ( and simpler version of stasis)
+
+```{r}
+rm ( list = ls())
+
+sourcefunctions()
+
+d = sensitivity.predicting.stasis.spread(folder = "fis-dist=50minflight-prop=0.1", depvar = "lrspread")
+d
+
+dg$flock.stasis = -dg$flock.stasis
+d2 = sensitivity.predicting.stasis.spread(folder = "fis-dist=50minflight-prop=0.1", depvar = "flock.stasis")
+d2[,"t-value"] = -d2[,"t-value"]
+d2
+
+d3 = rbind( d, d2)
+d3
+write.csv(d3,file = file.path(PROJHOME , "Output", "Tables_stats", "predictors_f-stasis_lr-spread.csv"))
+```
+
+#7. proportion of leaders 
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+}
+
+# new variable 
+dg$prop.leaders = NA
+
+dg$prop.leaders[dg$experiment == "Training"] = 0.5
+dg$prop.leaders[dg$lead.fol == "fol"] = NA
+dg$prop.leaders[dg$lead.fol == "lead"] = 1
+
+mod = stat.funct.group.2var.sum(dg,"box",depvar = "medspeed", indvar1 = "insta.size", indvar2 = "prop.leaders",experiment = "all")
+summary(mod[[1]])
+diagnostics.plot(mod[[1]])
+mod[[2]]
+boxplot(dg$medspeed~dg$prop.leaders)
+names(dg)
+```
+
+
+#8. Long version, lr spread
+
+
+```{R}
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+}
+
+###### stats
+
+# Does leader comp. predict ;r spread
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "lead.fol",cond = NULL,experiment = "leadManip")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+#yes 
+
+# Does mass comp. predict lrspread
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "masscond",cond = NULL,experiment = "GMC")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# no - all conditions
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "homo_hetero",cond = NULL,experiment = "GMC")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# no - only considering homo vs hetero
+
+# Does homogeneity predict lrspread
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "homo_hetero",cond = NULL,experiment = "all")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# no - all
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "homo_hetero_sub_fol",cond = NULL,experiment = "all")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# yes - if we remove annoying followers
+
+# Does flight order predict lrspread?
+d = stat.funct.group(dg,"log",depvar = "lrspread",indvar = "flight.order",cond = NULL,experiment = "all")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# close to decreasing - All
+d = stat.funct.group(dg,"log",depvar = "lrspread",indvar = "flight.order",cond = NULL,experiment = "leadManip")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# increasing - not sig. Leadmanip
+d = stat.funct.group(dg,"log",depvar = "lrspread",indvar = "flight.order",cond = NULL,experiment = "GMC")
+paste ( "t =" ,  as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# decreasing - not sig. massmanip
+d = stat.funct.group(dg,"log",depvar = "lrspread",indvar = "flight.order",cond = NULL,experiment = "Training")
+paste ( "t =" , -as.numeric(as.character(d[[2]]$`t-value`[2])), 
+        ", p =" ,  as.numeric(as.character(d[[2]]$`p-value`[2])))
+# decreasing - not sig. Training
+
+plot(dg$lrspread~dg$flight.order)
+
+#Houskeeping
+rm(list = ls())
+
+# libraries
+library( nlme)
+library( speedManip)
+library(leadManip)
+library( MASS)
+
+# folder 
+fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+
+# data
+load(file.path(fold, "dat-group.rda"))
+
+###### stats
+
+# Does insta.size.num predict lrspread
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "insta.size.num",cond = NULL,experiment = "all")
+d[[2]]
+AIC(d[[1]])
+# no
+
+# Does insta.size predict flock stasis
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "insta.size",cond = NULL,experiment = "all")
+d[[2]]
+# no
+
+# Does insta.size predict speed
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "insta.size.num",cond = NULL,experiment = "all")
+d[[2]]
+# no
+
+# Does insta.size predict speed
+d = stat.funct.group(dg,"box",depvar = "medspeed",indvar = "insta.size",cond = NULL,experiment = "all")
+d[[2]]
+# some do
+
+boxplot(dg$lrspread~dg$insta.size)
+
+
+
+```
+
+#9. Does leadership predict reduced density?
+```{R}
+
+{
+  #Houskeeping
+  rm(list = ls())
+  
+  # libraries
+  library( nlme)
+  library( speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+}
+
+d = stat.funct.group(dg,"box",depvar = "lrspread",indvar = "lead.fol",cond = NULL,experiment = "leadManip")
+summary(d[[1]])
+d[[2]]
+# yes - DF =  15 , t = 2.375951, p =  0.0313
+
+d = stat.funct.group(dg,"box",depvar = "fbspread",indvar = "lead.fol",cond = NULL,experiment = "leadManip")
+summary(d[[1]])
+# no - DF = 15, t =  0.742647, p =  0.4692
+d[[2]]
+
+d = stat.funct.group(dg,"box",depvar = "flock.spread",indvar = "lead.fol",cond = NULL,experiment = "leadManip")
+summary(d[[1]])
+# nearly - DF = 15, t = 1.975119, p =0.0670
+d[[2]]
+
+```
+
+# 10. Is there a cost to flock stasis? 
+
+```{R}
+
+{
+  
+  # housekeeping
+  rm(list = ls())
+  
+  ## Libraries
+  library( nlme )
+  library(emmeans)
+  library(plyr)
+  library(speedManip)
+  library(leadManip)
+  library( MASS)
+  
+  ## Data
+  fold = file.path(PROJHOME , "Output", "01_allmetrics_first_phase")
+  load(file.path(fold,"group-masscomp-metrics.rda" ))
+  d.grpmas = mat
+  d.grpmas$indvar = d.grpmas$var
+  rm(mat)
+  load(file.path(fold,"lead-manip_metrics.rda"  ))
+  d.lead = dat
+  d.lead$indvar = d.lead$var
+  rm(dat)
+  load(file.path(fold,"solo-massload_metrics.rda" ))
+  d.solo = metrics
+  d.solo$indvar = d.solo$var
+  rm(metrics)
+  rm(fold)
+  
+    # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+  
+  # source
+  source( file.path(PROJHOME , "Source", "04_statsource.r"))
+  
+
+}
+
+save( df , file = file.path (PROJHOME , "Output" ,  "foos" , "ffampvsstasisdata.rda"))
+
+
+```
+
+
+## 11. were leadership identification flights faster or slower than followers / leaders? 
+
+```{R}
+{
+  
+  # housekeeping
+  rm(list = ls())
+  
+  ## Libraries
+  library( nlme )
+  library(emmeans)
+  library(plyr)
+  library(speedManip)
+  library(leadManip)
+  library( MASS)
+  
+
+    fold = file.path(PROJHOME , "Output", "01_allmetrics_first_phase")
+  load(file.path(fold,"lead-manip_metrics.rda"  ))
+  d.lead = dat
+  d.lead$indvar = d.lead$var
+  rm(dat)
+    # folder 
+  fold = file.path(PROJHOME ,"Output", "Groupflight_ind_grp_metrics","dat4stats", "fis-dist=50minflight-prop=0.1")
+  
+  # data
+  load(file.path(fold, "dat-group.rda"))
+}
+
+dgt = dg[dg$experiment == "Training",]
+paste ( "mean = ", round (  mean( dgt$medspeed, na.rm = T),3), " + - (sd)",
+round ( sd  ( dgt$medspeed, na.rm = T), 3))
+tapply ( d.lead$medspeed , d.lead$lead.fol, function ( x) { mean(x, na.rm = T)})
+tapply ( d.lead$medspeed , d.lead$lead.fol, function ( x) { sd  (x, na.rm = T)})
+```
+
+
